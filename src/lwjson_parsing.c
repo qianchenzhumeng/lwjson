@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <errno.h>
 
 typedef enum {
     LWJSON_PARENT_OBJECT,           // Tipo objeto
@@ -26,8 +25,8 @@ typedef enum {
 } LwJsonParserSM;
 
 typedef struct {
-    uint32_t offset;
-    uint32_t len;
+    unsigned int offset;
+    unsigned int len;
     LwJsonValueType type;
 } LwJsonFindResult;
 
@@ -36,13 +35,13 @@ typedef struct {
     const LwJsonMsg *msg;
     LwJsonParentType stack[LWJSON_DEPTH_MAX + 1];   // Array con el tipo de padre del objeto actual (útil en parsing)
     LwJsonParserSM state;                           // Estado actual para la máquina de estados
-    uint32_t depth;                                 // Valor de profundidad actual en la búsqueda o parsing
-    uint32_t findDepth;                             // Valor de profundidad de la última coincidencia con path
-    uint32_t searchDepth;                           // Profundidad de path
-    bool searchValuePending;                        // Path encontrado. Lectura de valor pendiente
-    bool found;                                     // Flag que indica si se ha encontrado
+    unsigned int depth;                                 // Valor de profundidad actual en la búsqueda o parsing
+    unsigned int findDepth;                             // Valor de profundidad de la última coincidencia con path
+    unsigned int searchDepth;                           // Profundidad de path
+    int searchValuePending;                        // Path encontrado. Lectura de valor pendiente
+    int found;                                     // Flag que indica si se ha encontrado
     char *lastName;                                 // Puntero a último nombre de propiedad
-    uint32_t currentArrayIndex;                     // Índice de elemento en array
+    unsigned int currentArrayIndex;                     // Índice de elemento en array
     char *p;                                        // Puntero al caracter actual
     LwJsonFindResult *findResult;
 } LwJsonParser;
@@ -51,9 +50,9 @@ typedef struct {
 
 static int lwJsonFindValue(const char **path, const LwJsonMsg *msg, LwJsonValueType expectedType, LwJsonMsg *value);
 static int lwJsonFind(const char **path, const LwJsonMsg *msg, LwJsonFindResult *findResult);
-static uint32_t lwJsonCalculatePathDepth(const char **path);
+static unsigned int lwJsonCalculatePathDepth(const char **path);
 static void PrefilterChar(char *c);
-static bool SkippableChar(char c);
+static int SkippableChar(char c);
 static void FindSmStartHandler(LwJsonParser *parser);
 static void FindSmObjectHandler(LwJsonParser *parser);
 static void FindSmArrayHandler(LwJsonParser *parser);
@@ -67,8 +66,8 @@ static void FindSmLevelEndHandler(LwJsonParser *parser);
 static void lwJsonParserPush(LwJsonParser *parser, LwJsonParentType parent);
 static void lwJsonParserPop(LwJsonParser *parser, LwJsonParentType expectedParent);
 static int GetArrayLen(const LwJsonMsg *jsonArray);
-static int GetIntArray(const LwJsonMsg *jsonArray, int *intArray, uint32_t intArrayLen);
-static int GetStringArray(const LwJsonMsg *jsonArray, char **stringArray, uint32_t *stringLenArray, uint32_t arrayLen);
+static int GetIntArray(const LwJsonMsg *jsonArray, int *intArray, unsigned int intArrayLen);
+static int GetStringArray(const LwJsonMsg *jsonArray, char **stringArray, unsigned int *stringLenArray, unsigned int arrayLen);
 
 
 int lwJsonGetObject(const char **path, const LwJsonMsg *msg, LwJsonMsg *object) {
@@ -92,7 +91,7 @@ int lwJsonGetArrayLen(const char **path, const LwJsonMsg *msg) {
     return GetArrayLen(&jsonArray);
 }
 
-int lwJsonGetIntArray(const char **path, const LwJsonMsg *msg, int *intArray, uint32_t intArrayLen) {
+int lwJsonGetIntArray(const char **path, const LwJsonMsg *msg, int *intArray, unsigned int intArrayLen) {
     int result;
     LwJsonMsg jsonArray;
 
@@ -104,7 +103,7 @@ int lwJsonGetIntArray(const char **path, const LwJsonMsg *msg, int *intArray, ui
     return GetIntArray(&jsonArray, intArray, intArrayLen);
 }
 
-int lwJsonGetStringArray(const char **path, const LwJsonMsg *msg, char **stringArray, uint32_t *stringLenArray, uint32_t arrayLen) {
+int lwJsonGetStringArray(const char **path, const LwJsonMsg *msg, char **stringArray, unsigned int *stringLenArray, unsigned int arrayLen) {
     int result;
     LwJsonMsg jsonArray;
 
@@ -116,9 +115,9 @@ int lwJsonGetStringArray(const char **path, const LwJsonMsg *msg, char **stringA
     return GetStringArray(&jsonArray, stringArray, stringLenArray, arrayLen);
 }
 
-int lwJsonGetString(const char **path, const LwJsonMsg *msg, char *value, uint32_t valueLen) {
+int lwJsonGetString(const char **path, const LwJsonMsg *msg, char *value, unsigned int valueLen) {
     int result;
-    uint32_t stringLen;
+    unsigned int stringLen;
     LwJsonMsg jsonString;
 
     result = lwJsonFindValue(path, msg, LWJSON_VAL_STRING, &jsonString);
@@ -154,7 +153,22 @@ int lwJsonGetInt(const char **path, const LwJsonMsg *msg, int *value) {
     return 0;
 }
 
-int lwJsonGetBool(const char **path, const LwJsonMsg *msg, bool *value) {
+int lwJsonGetDecimal(const char **path, const LwJsonMsg *msg, float *value) {
+    int result;
+    LwJsonMsg jsonDecimal;
+
+    result = lwJsonFindValue(path, msg, LWJSON_VAL_DECIMAL, &jsonDecimal);
+    if (result != 0) {
+        return result;
+    }
+
+    // Get decimal
+    (*value) = atof(jsonDecimal.string);
+
+    return 0;
+}
+
+int lwJsonGetBool(const char **path, const LwJsonMsg *msg, int *value) {
     int result;
     LwJsonMsg jsonBoolean;
 
@@ -278,7 +292,7 @@ static void PrefilterChar(char *p) {
     }
 }
 
-static bool SkippableChar(char c) {
+static int SkippableChar(char c) {
 
     if (c == '\t' || c == ' ') {
         return true;
@@ -325,7 +339,7 @@ static void FindSmArrayHandler(LwJsonParser *parser) {
 }
 
 static void FindSmNameHandler(LwJsonParser *parser) {
-    uint32_t nameLen;
+    unsigned int nameLen;
 
     while (parser->state == LWJSON_SM_NAME) {
         // Nombre. Puede encontrarse un carácter válido o el fin de nombre
@@ -378,7 +392,7 @@ static void FindSmValueHandler(LwJsonParser *parser) {
         tempType = LWJSON_VAL_STRING;
     } else if ((currentChar == '-') || ((currentChar >= '0') && (currentChar <='9'))) {
         // Sólo soporta enteros
-        parser->state = LWJSON_SM_NUMBER;
+        parser->state = LWJSON_SM_NUMBER;   // or decimal
         tempType = LWJSON_VAL_NUMBER;
     } else if (currentChar == '[') {
         tempType = LWJSON_VAL_ARRAY;
@@ -431,8 +445,11 @@ static void FindSmStringHandler(LwJsonParser *parser) {
 static void FindSmNumberHandler(LwJsonParser *parser) {
     while (parser->state == LWJSON_SM_NUMBER) {
         // Sólo se soportan enteros. Si no se encuentra un entero, se pasa directamente a VALUE_END
-        if (((parser->p[0]) >= '0') && ((parser->p[0]) <= '9')) {
+        if ((((parser->p[0]) >= '0') && ((parser->p[0]) <= '9')) || parser->p[0] == '.') {
             parser->p++;
+            if (parser->p[0] == '.'){
+                parser->findResult->type = LWJSON_VAL_DECIMAL;
+            }
         } else {
             parser->state = LWJSON_SM_VALUE_END;
             parser->p--;
@@ -504,8 +521,8 @@ static void FindSmLevelEndHandler(LwJsonParser *parser) {
     parser->state = LWJSON_SM_VALUE_END;
 }
 
-static uint32_t lwJsonCalculatePathDepth(const char **path) {
-    uint32_t result = 0;
+static unsigned int lwJsonCalculatePathDepth(const char **path) {
+    unsigned int result = 0;
 
     while (result <= LWJSON_DEPTH_MAX) {
         if (path[result] == NULL) {
@@ -546,8 +563,8 @@ static void lwJsonParserPop(LwJsonParser *parser, LwJsonParentType expectedParen
 }
 
 static int GetArrayLen(const LwJsonMsg *jsonArray) {
-    uint32_t level = 0;
-    uint32_t items = 0;
+    unsigned int level = 0;
+    unsigned int items = 0;
     char *p, *arrayEnd;
 
     p = jsonArray->string;
@@ -583,9 +600,9 @@ static int GetArrayLen(const LwJsonMsg *jsonArray) {
     return items;
 }
 
-static int GetIntArray(const LwJsonMsg *jsonArray, int *intArray, uint32_t intArrayLen) {
-    uint32_t i, index = 0;
-    uint32_t count;
+static int GetIntArray(const LwJsonMsg *jsonArray, int *intArray, unsigned int intArrayLen) {
+    unsigned int i, index = 0;
+    unsigned int count;
     char *p;
     enum {
         INT_ARRAY_INIT,
@@ -647,9 +664,9 @@ static int GetIntArray(const LwJsonMsg *jsonArray, int *intArray, uint32_t intAr
     return count;
 }
 
-static int GetStringArray(const LwJsonMsg *jsonArray, char **stringArray, uint32_t *stringLenArray, uint32_t arrayLen) {
-    uint32_t i, index = 0;
-    uint32_t count;
+static int GetStringArray(const LwJsonMsg *jsonArray, char **stringArray, unsigned int *stringLenArray, unsigned int arrayLen) {
+    unsigned int i, index = 0;
+    unsigned int count;
     char *p;
     enum {
         STR_ARRAY_INIT,

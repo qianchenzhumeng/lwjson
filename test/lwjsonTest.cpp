@@ -214,7 +214,7 @@ TEST(lwjson, ParseTrue)
     LwJsonMsg testMsg = {testString, sizeof(testString) - 1};
     char* path[] = {NULL, NULL};
     int callResult;
-    bool value;
+    int value;
 
     path[0] = (char*)"value";
     callResult = lwJsonGetBool((const char**)path, &testMsg, &value);
@@ -228,7 +228,7 @@ TEST(lwjson, ParseFalse)
     LwJsonMsg testMsg = {testString, sizeof(testString) - 1};
     char* path[] = {NULL, NULL};
     int callResult;
-    bool value;
+    int value;
 
     path[0] = (char*)"value";
     callResult = lwJsonGetBool((const char**)path, &testMsg, &value);
@@ -242,7 +242,7 @@ TEST(lwjson, ParseStringWithSpacesTabsLRAndCF)
     LwJsonMsg testMsg = {testString, sizeof(testString) - 1};
     char* path[] = {NULL, NULL, NULL};
     int callResult;
-    bool boolean;
+    int boolean;
     const int STRING_LEN = 9;
     char string[STRING_LEN + 1];
     int integer;
@@ -270,7 +270,7 @@ TEST(lwjson, ParseAcceptEmptyObjects)
     LwJsonMsg testMsg = {testString, sizeof(testString) - 1};
     char* path[] = {NULL, NULL, NULL};
     int callResult;
-    bool boolean;
+    int boolean;
 
     path[0] = (char*)"object";
     path[1] = (char*)"boolean";
@@ -476,6 +476,68 @@ TEST(lwjson, GenerateNegativeIntegerRunsOutOfSpace)
     lwJsonWriteStart(&testMsg);
     lwJsonStartObject(&testMsg);
     lwJsonAddIntToObject(&testMsg, "value", -100);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+    CHECK_EQUAL(-ENOMEM, result);
+}
+
+TEST(lwjson, GeneratePositiveDecimal)
+{
+    const unsigned int STRING_LEN = 15;
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddDecimalToObject(&testMsg, "value", 25.01);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+    CHECK_EQUAL(0, result);
+    STRCMP_EQUAL("{\"value\":25.01}", string);
+}
+
+TEST(lwjson, GeneratePositiveDecimalRunsOutOfSpace)
+{
+    const unsigned int STRING_LEN = 14;
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddDecimalToObject(&testMsg, "value", 25.01);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+    CHECK_EQUAL(-ENOMEM, result);
+}
+
+TEST(lwjson, GenerateNegativeDecimal)
+{
+    const unsigned int STRING_LEN = 16;
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddDecimalToObject(&testMsg, "value", -25.01);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+    CHECK_EQUAL(0, result);
+    STRCMP_EQUAL("{\"value\":-25.01}", string);
+}
+
+TEST(lwjson, GenerateNegativeDecimalRunsOutOfSpace)
+{
+    const unsigned int STRING_LEN = 15;
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddDecimalToObject(&testMsg, "value", -25.01);
     lwJsonCloseObject(&testMsg);
     result = lwJsonWriteEnd(&testMsg);
     CHECK_EQUAL(-ENOMEM, result);
@@ -724,6 +786,53 @@ TEST(lwjson, GenerateIntArrayRunsOutOfSpace)
     CHECK_EQUAL(-ENOMEM, result);
 }
 
+TEST(lwjson, GenerateDecimalArray)
+{
+    const unsigned int ARRAY_LEN = 5;
+    const unsigned int STRING_LEN = 49;
+    float decimalArray[ARRAY_LEN] = {-5.0, 234.1, 21.2, -5643.3, 123456.12};
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    unsigned int i;
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddArrayToObject(&testMsg, "array");
+    for (i = 0; i < ARRAY_LEN; i++) {
+        lwJsonAddDecimalToArray(&testMsg, decimalArray[i]);
+    }
+    lwJsonCloseArray(&testMsg);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+
+    CHECK_EQUAL(0, result);
+    STRCMP_EQUAL("{\"array\":[-5.00,234.10,21.20,-5643.30,123456.12]}", string);
+}
+
+TEST(lwjson, GenerateDecimalArrayRunsOutOfSpace)
+{
+    const unsigned int ARRAY_LEN = 5;
+    const unsigned int STRING_LEN = 48;
+    float decimalArray[ARRAY_LEN] = {-5.0, 234.1, 21.2, -5643.3, 123456.12};
+    char string[STRING_LEN + 1];
+    LwJsonMsg testMsg = {string, STRING_LEN};
+    unsigned int i;
+    int result;
+
+    lwJsonWriteStart(&testMsg);
+    lwJsonStartObject(&testMsg);
+    lwJsonAddArrayToObject(&testMsg, "array");
+    for (i = 0; i < ARRAY_LEN; i++) {
+        lwJsonAddDecimalToArray(&testMsg, decimalArray[i]);
+    }
+    lwJsonCloseArray(&testMsg);
+    lwJsonCloseObject(&testMsg);
+    result = lwJsonWriteEnd(&testMsg);
+
+    CHECK_EQUAL(-ENOMEM, result);
+}
+
 TEST(lwjson, GenerateStringArray)
 {
     const unsigned int ARRAY_LEN = 5;
@@ -820,7 +929,7 @@ TEST(lwjson, GenerateStringArrayRunsOutOfSpace)
 
 TEST(lwjson, GenerateMiscellaneousObject)
 {
-    const unsigned int STRING_LEN = 117;
+    const unsigned int STRING_LEN = 152;
     char string[STRING_LEN + 1];
     LwJsonMsg testMsg = {string, STRING_LEN};
     int result;
@@ -831,13 +940,16 @@ TEST(lwjson, GenerateMiscellaneousObject)
     lwJsonAddBooleanToObject(&testMsg, "boolean", true);
     lwJsonAddStringToObject(&testMsg, "string", "testing");
     lwJsonAddIntToObject(&testMsg, "integer", 100);
+    lwJsonAddDecimalToObject(&testMsg, "decimal", 2.12);
     lwJsonAddArrayToObject(&testMsg, "array");
     lwJsonAddObjectToArray(&testMsg);
     lwJsonAddIntToObject(&testMsg, "attr1", 10);
     lwJsonAddIntToObject(&testMsg, "attr2", 20);
+    lwJsonAddDecimalToObject(&testMsg, "attr3", 30.1);
     lwJsonCloseObject(&testMsg);
     lwJsonAddStringToArray(&testMsg, "arrayString");
     lwJsonAddIntToArray(&testMsg, -5);
+    lwJsonAddDecimalToArray(&testMsg, -5.0);
     lwJsonAddBooleanToArray(&testMsg, false);
     lwJsonCloseArray(&testMsg);
     lwJsonCloseObject(&testMsg);
@@ -845,12 +957,12 @@ TEST(lwjson, GenerateMiscellaneousObject)
     result = lwJsonWriteEnd(&testMsg);
 
     CHECK_EQUAL(0, result);
-    STRCMP_EQUAL("{\"object\":{\"boolean\":true,\"string\":\"testing\",\"integer\":100,\"array\":[{\"attr1\":10,\"attr2\":20},\"arrayString\",-5,false]}}", string);
+    STRCMP_EQUAL("{\"object\":{\"boolean\":true,\"string\":\"testing\",\"integer\":100,\"decimal\":2.12,\"array\":[{\"attr1\":10,\"attr2\":20,\"attr3\":30.10},\"arrayString\",-5,-5.00,false]}}", string);
 }
 
 TEST(lwjson, GenerateMiscellaneousObjectRunsOutOfSpace)
 {
-    const unsigned int STRING_LEN = 116;
+    const unsigned int STRING_LEN = 151;
     char string[STRING_LEN + 1];
     LwJsonMsg testMsg = {string, STRING_LEN};
     int result;
@@ -861,18 +973,22 @@ TEST(lwjson, GenerateMiscellaneousObjectRunsOutOfSpace)
     lwJsonAddBooleanToObject(&testMsg, "boolean", true);
     lwJsonAddStringToObject(&testMsg, "string", "testing");
     lwJsonAddIntToObject(&testMsg, "integer", 100);
+    lwJsonAddDecimalToObject(&testMsg, "decimal", 2.12);
     lwJsonAddArrayToObject(&testMsg, "array");
     lwJsonAddObjectToArray(&testMsg);
     lwJsonAddIntToObject(&testMsg, "attr1", 10);
     lwJsonAddIntToObject(&testMsg, "attr2", 20);
+    lwJsonAddDecimalToObject(&testMsg, "attr3", 30.1);
     lwJsonCloseObject(&testMsg);
     lwJsonAddStringToArray(&testMsg, "arrayString");
     lwJsonAddIntToArray(&testMsg, -5);
+    lwJsonAddDecimalToArray(&testMsg, -5.0);
     lwJsonAddBooleanToArray(&testMsg, false);
     lwJsonCloseArray(&testMsg);
     lwJsonCloseObject(&testMsg);
     lwJsonCloseObject(&testMsg);
     result = lwJsonWriteEnd(&testMsg);
+
 
     CHECK_EQUAL(-ENOMEM, result);
 }

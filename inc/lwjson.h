@@ -5,16 +5,14 @@
 extern "C"{
 #endif
 
-#include <stdint.h>
-#include <stdbool.h>
 #include "lwjson_types.h"
 #include "lwjson_config.h"
 
 // Generation
-typedef struct {
+typedef struct LwJsonMsg{
     char *string;
-    uint32_t len;
-    uint32_t _offset;
+    unsigned int len;
+    unsigned int _offset;
     int _lastError;
 } LwJsonMsg;
 
@@ -27,22 +25,25 @@ int lwJsonGetIntArray(const char **path, const LwJsonMsg *msg, int *array, unsig
 int lwJsonGetStringArray(const char **path, const LwJsonMsg *msg, char **pArray, unsigned int *pLen, unsigned int arrayLen);
 int lwJsonGetString(const char **path, const LwJsonMsg *msg, char *value, unsigned int valueLen);
 int lwJsonGetInt(const char **path, const LwJsonMsg *msg, int *value);
-int lwJsonGetBool(const char **path, const LwJsonMsg *msg, bool *value);
+int lwJsonGetDecimal(const char **path, const LwJsonMsg *msg, float *value);
+int lwJsonGetBool(const char **path, const LwJsonMsg *msg, int *value);
 
 
 int lwJsonWriteStart(LwJsonMsg *msg);
 int lwJsonWriteEnd(LwJsonMsg *msg);
-void LwJsonWriteApplyOffset(LwJsonMsg *msg, uint32_t offset);
+void LwJsonWriteApplyOffset(LwJsonMsg *msg, unsigned int offset);
 int lwJsonStartObject(LwJsonMsg *msg);
 int lwJsonStartArray(LwJsonMsg *msg);
 int lwJsonCloseObject(LwJsonMsg *msg);
 int lwJsonCloseArray(LwJsonMsg *msg);
 int lwJsonAddStringToObject(LwJsonMsg *msg, const char *name, const char *string);
 int lwJsonAddStringToArray(LwJsonMsg *msg, const char *string);
-int lwJsonAddIntToObject(LwJsonMsg *msg, const char *name, int64_t value);
-int lwJsonAddIntToArray(LwJsonMsg *msg, int64_t value);
-int lwJsonAddBooleanToObject(LwJsonMsg *msg, const char *name, bool boolean);
-int lwJsonAddBooleanToArray(LwJsonMsg *msg, bool boolean);
+int lwJsonAddIntToObject(LwJsonMsg *msg, const char *name, int value);
+int lwJsonAddDecimalToObject(LwJsonMsg *msg, const char *name, float value);
+int lwJsonAddIntToArray(LwJsonMsg *msg, int value);
+int lwJsonAddDecimalToArray(LwJsonMsg *msg, float value);
+int lwJsonAddBooleanToObject(LwJsonMsg *msg, const char *name, int boolean);
+int lwJsonAddBooleanToArray(LwJsonMsg *msg, int boolean);
 int lwJsonAddObjectToObject(LwJsonMsg *msg, const char *name);
 int lwJsonAddObjectToArray(LwJsonMsg *msg);
 int lwJsonAddArrayToObject(LwJsonMsg *msg, const char *name);

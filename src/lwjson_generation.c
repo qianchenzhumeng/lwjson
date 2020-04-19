@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <errno.h>
 
 static int lwJsonCalculateValueStringLength(LwJsonValueType type, LwJsonValue *value);
 static int lwJsonCheckWriteError(LwJsonMsg *msg);
@@ -42,7 +41,7 @@ int lwJsonWriteEnd(LwJsonMsg *msg) {
     return 0;
 }
 
-void LwJsonWriteApplyOffset(LwJsonMsg *msg, uint32_t offset) {
+void LwJsonWriteApplyOffset(LwJsonMsg *msg, unsigned int offset) {
     if (msg == NULL) {
         return;
     }
@@ -116,28 +115,42 @@ int lwJsonAddStringToArray(LwJsonMsg *msg, const char *string) {
     return lwJsonAddValueToArray(msg, type, &jsonValue);
 }
 
-int lwJsonAddIntToObject(LwJsonMsg *msg, const char *name, long long value) {
+int lwJsonAddIntToObject(LwJsonMsg *msg, const char *name, int value) {
     LwJsonValueType type = LWJSON_VAL_NUMBER;
     LwJsonValue jsonValue;
     jsonValue.valueInt = value;
     return lwJsonAddNameAndValuePair(msg, name, type, &jsonValue);
 }
 
-int lwJsonAddBooleanToObject(LwJsonMsg *msg, const char *name, bool boolean) {
+int lwJsonAddDecimalToObject(LwJsonMsg *msg, const char *name, float value) {
+    LwJsonValueType type = LWJSON_VAL_DECIMAL;
+    LwJsonValue jsonValue;
+    jsonValue.valueDecimal= value;
+    return lwJsonAddNameAndValuePair(msg, name, type, &jsonValue);
+}
+
+int lwJsonAddBooleanToObject(LwJsonMsg *msg, const char *name, int boolean) {
     LwJsonValueType type = LWJSON_VAL_BOOLEAN;
     LwJsonValue jsonValue;
     jsonValue.valueBool = boolean;
     return lwJsonAddNameAndValuePair(msg, name, type, &jsonValue);
 }
 
-int lwJsonAddIntToArray(LwJsonMsg *msg, long long value) {
+int lwJsonAddIntToArray(LwJsonMsg *msg, int value) {
     LwJsonValueType type = LWJSON_VAL_NUMBER;
     LwJsonValue jsonValue;
     jsonValue.valueInt = value;
     return lwJsonAddValueToArray(msg, type, &jsonValue);
 }
 
-int lwJsonAddBooleanToArray(LwJsonMsg *msg, bool boolean) {
+int lwJsonAddDecimalToArray(LwJsonMsg *msg, float value) {
+    LwJsonValueType type = LWJSON_VAL_DECIMAL;
+    LwJsonValue jsonValue;
+    jsonValue.valueDecimal = value;
+    return lwJsonAddValueToArray(msg, type, &jsonValue);
+}
+
+int lwJsonAddBooleanToArray(LwJsonMsg *msg, int boolean) {
     LwJsonValueType type = LWJSON_VAL_BOOLEAN;
     LwJsonValue jsonValue;
     jsonValue.valueBool = boolean;
@@ -175,10 +188,10 @@ int lwJsonAddNullToArray(LwJsonMsg *msg) {
 }
 
 int lwJsonAppendObject(LwJsonMsg *msg, const char *name, const char *objString) {
-    uint32_t objLen;
-    uint32_t nameLen;
-    uint32_t requiredLen;
-    bool separator = false;
+    unsigned int objLen;
+    unsigned int nameLen;
+    unsigned int requiredLen;
+    int separator = false;
 
     if (name == NULL || objString == NULL) {
         return -EINVAL;
@@ -235,7 +248,14 @@ static int lwJsonCalculateValueStringLength(LwJsonValueType type, LwJsonValue *v
         if (value == NULL) {
             return -EINVAL;
         }
-        sprintf(auxString, "%lld", value->valueInt);
+        sprintf(auxString, "%d", value->valueInt);
+        valueLen = strlen(auxString);
+        break;
+    case LWJSON_VAL_DECIMAL:
+        if (value == NULL) {
+            return -EINVAL;
+        }
+        sprintf(auxString, "%.2f", value->valueDecimal);
         valueLen = strlen(auxString);
         break;
     case LWJSON_VAL_BOOLEAN:
@@ -278,7 +298,7 @@ static int lwJsonCheckWriteError(LwJsonMsg *msg) {
 static int lwJsonAddNameAndValuePair(LwJsonMsg *msg, const char *name, LwJsonValueType type, LwJsonValue *value) {
     unsigned int entryLen = 0;
     unsigned int nameLen;
-    unsigned int valueLen = 0;
+    int valueLen = 0;
     char auxString[50];
     unsigned char flagSeparator = 0;
 
@@ -335,7 +355,12 @@ static int lwJsonAddNameAndValuePair(LwJsonMsg *msg, const char *name, LwJsonVal
         msg->_offset++;
         break;
     case LWJSON_VAL_NUMBER:
-        sprintf(auxString, "%lld", value->valueInt);
+        sprintf(auxString, "%d", value->valueInt);
+        strcpy(msg->string + msg->_offset, auxString);
+        msg->_offset += valueLen;
+        break;
+    case LWJSON_VAL_DECIMAL:
+        sprintf(auxString, "%.2f", value->valueDecimal);
         strcpy(msg->string + msg->_offset, auxString);
         msg->_offset += valueLen;
         break;
@@ -366,7 +391,7 @@ static int lwJsonAddNameAndValuePair(LwJsonMsg *msg, const char *name, LwJsonVal
 
 static int lwJsonAddValueToArray(LwJsonMsg *msg, LwJsonValueType type, LwJsonValue *value) {
     unsigned int entryLen = 0;
-    unsigned int valueLen = 0;
+    int valueLen = 0;
     char auxString[50];
     unsigned char flagSeparator = 0;
 
@@ -408,7 +433,12 @@ static int lwJsonAddValueToArray(LwJsonMsg *msg, LwJsonValueType type, LwJsonVal
         msg->_offset++;
         break;
     case LWJSON_VAL_NUMBER:
-        sprintf(auxString, "%lld", value->valueInt);
+        sprintf(auxString, "%d", value->valueInt);
+        strcpy(msg->string + msg->_offset, auxString);
+        msg->_offset += valueLen;
+        break;
+    case LWJSON_VAL_DECIMAL:
+        sprintf(auxString, "%.2f", value->valueDecimal);
         strcpy(msg->string + msg->_offset, auxString);
         msg->_offset += valueLen;
         break;
